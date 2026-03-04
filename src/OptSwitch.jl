@@ -805,8 +805,9 @@ Terminal: at n=N, returns zeros (no future value). At n=N-1, V̂_j(t_N) = max_{j
 function calculate_Y(X_prev, X_next, learning_model, exp_params, payoffmodel, n)
     @unpack dt, J, K, L, N = exp_params
 
-    # Terminal: no next step exists, train model[N,j] on 0
-    n == N && return zeros(Float32, K, J)
+    # Terminal condition: V̂_j(t_N) = 0, so targets are zero for both
+    # n=N (trains R_N on zeros) and n=N-1 (E[V̂_j(t_N)] = E[0] = 0)
+    n + 1 >= N && return zeros(Float32, K, J)
 
     KL = K * L
 
