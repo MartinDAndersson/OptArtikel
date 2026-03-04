@@ -309,7 +309,7 @@ x_init[1] = D0
 x_init[2:4] .= 1
 x_init = repeat(x_init, inner=(1, K)) .+ randn(Float32, (d, K)) .* 0.005f0
 
-dir="aid"
+dir="ACLP"
 # Load pre-trained machine learning models
 data_dir = datadir(dir,"machines")
 filter_out = ["network 3", "algorithm=knn", "network 2", "network 4"]
@@ -368,10 +368,11 @@ df.prediction_accuracy = 1 ./ (1 .+ df.Prediction_Error)
 df = df[:, [:Strategy, :NormalizedFinalValue, :decision_similiarity, :prediction_accuracy]]
 df = prepare_for_latex(df)
 using CSV
-CSV.write(datadir("aid/aid_strategy_summary.csv"), df)
+CSV.write(datadir("ACLP/ACLP_strategy_summary.csv"), df)
 
 # Generate and save plots
 plts = plot_strategy_analysis(strat_analysis)
-save(plotsdir("aid/aid_switching_strategies.pdf"), plts[1])
-save(plotsdir("aid/aid_strategy_performance.pdf"), plts[2])
+mkpath(plotsdir("ACLP"))
+save(plotsdir("ACLP/ACLP_switching_strategies.pdf"), plts[1])
+save(plotsdir("ACLP/ACLP_strategy_performance.pdf"), plts[2])
 plts = plot_value_prediction_error(mods, sample_paths, times, rev, c, dt, J)

@@ -162,5 +162,5 @@ function main(;L=1, old_models=[], dir="Carmona",model_types = ["knn"])
     model_types=model_types)
 end
 # Run main experiment
-main(;L=1,dir="CL",model_types=["network"])
+main(;L=1,dir="CL",model_types=["knn", "forest", "lgbm", "linear"])
 

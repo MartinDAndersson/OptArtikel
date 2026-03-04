@@ -175,4 +175,4 @@ function main(;L=1, old_models=[], dir="BSP", model_types = ["knn"])
 end
 
 # Run main experiment
-main(;L=1, dir="BSP", model_types=["knn"])
+main(;L=1, dir="BSP", model_types=["knn", "network", "forest", "lgbm", "linear"])

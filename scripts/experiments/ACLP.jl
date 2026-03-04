@@ -393,12 +393,10 @@ function main(K, L; model_types=["pca_knn"], dir="ACLP",save_results=false)
 
     payoffmodel = OptSwitch.PayOffModel(payoff_params,rev,c)
 
-    OptSwitch.MLJ_main(new_params, RandomProcess, payoffmodel, x_init, dir=dir, model_types=model_types,save_results=false)
+    OptSwitch.MLJ_main(new_params, RandomProcess, payoffmodel, x_init, dir=dir, model_types=model_types)
 
 end
 
 
 
-# Run the ACLP experiment with 10,000 trajectories and PCA+KNN model
-# Reduce K for faster execution, or increase for more accurate results
-@benchmark main(10000, 1, model_types=["pca_knn"], dir="ACLP",save_results=false)
+main(50000, 1, model_types=["network", "ridge", "lasso"], dir="ACLP")

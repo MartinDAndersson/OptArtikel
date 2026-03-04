@@ -502,3 +502,4 @@ test_main_function_results/test_main/machines/J=2_K=100_L=2_N=5_algorithm=linear
 neural_network_test_results/regression_test.png
 neural_network_test_results/training_test.png
 strategy_analysis.csv
+results_backup/
