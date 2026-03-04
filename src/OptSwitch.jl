@@ -59,6 +59,8 @@ using CairoMakie
 using DataFramesMeta: @transform, @select, @rename, @subset
 import SimpleChains: static
 
+const rng = Random.default_rng()
+
 # Load MLJ models that will be used for regression
 
 KNN = MLJ.@load KNNRegressor
@@ -69,7 +71,7 @@ LinearRegressor = MLJ.@load LinearRegressor pkg = MLJLinearModels
 RidgeRegressor = MLJ.@load RidgeRegressor pkg = MLJLinearModels
 LassoRegressor = MLJ.@load LassoRegressor pkg = MLJLinearModels
 PCA = MLJ.@load PCA pkg = MultivariateStats
-InteractionTransformer = MLJ.@load InteractionTransformer pkg=MLJTransforms
+InteractionTransformer = MLJ.@load InteractionTransformer pkg=MLJModels
 LGBMReg = MLJ.@load LGBMRegressor pkg=LightGBM
 # Export plot functions
 export plot_3d

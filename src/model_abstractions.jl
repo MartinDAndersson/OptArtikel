@@ -244,7 +244,7 @@ function save_learningmodel_disk(learningmodel,type,dir)
     if type == "sklearn"
         name = learningmodel.name
         joblib.dump(learningmodel.model,dir*"/"*name*".pkl")
-    elseif type == "sc"
+    elseif type == "sc" || type == "lux"
         #models = learningmodel.model
         name = learningmodel.name
         save(dir*"/"*name*".jld2",Dict("learningmodel"=>learningmodel))
