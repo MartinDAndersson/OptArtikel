@@ -783,15 +783,22 @@ end
 """
     calculate_Y(X_prev, X_next, learning_model, exp_params, payoffmodel, n)
 
-Compute regression targets Y[k,j] = (1/L) Σ_l V̂_j(t_{n+1}, X^{k,l}_{t_{n+1}}).
+Compute regression targets for backward induction.
 
-Each model j learns g_j(t_n, x) = E[V̂_j(t_{n+1}, X) | X_{t_n} = x], where
-    V̂_j(t_{n+1}, x) = max_{j'} [ dt·f_{j'} - c_{jj'} + ĝ_{j'}(t_{n+1}, x) ]
-is the reconstructed value function at t_{n+1}. Max is applied per sample
-before averaging over L transitions (correct order: max outside E).
+Returns Y of size (K, J), where Y[k,j] ≈ E[V̂_j(t_{n+1}, X_{t_{n+1}}) | X_{t_n} = X^k].
 
-Terminal condition: at n=N no next step exists, so model[N,j] is trained on 0.
-At n=N-1 the targets are E[max_{j'}[f_{j'}(t_N) - c_{jj'}]] (last-step payoffs).
+The reconstructed value function is:
+    V̂_j(t, x) = max_{j'} [ dt·f_{j'} - c_{jj'} + ĝ_{j'}(t, x) ]
+where ĝ_{j'} are the trained regression models from the previous backward step.
+
+For each of the K×L one-step transitions, V̂_j is computed per sample (max first),
+then averaged over L transitions. This ensures correct Bellman structure (max outside E).
+
+At prediction time, the value function for starting mode i is:
+    V̂_i(t_n, x) = max_j [ dt·f_j - c_{ij} + R_j(t_n, x) ]
+where R_j = model[n,j] is the trained regression output from this function.
+
+Terminal: at n=N, returns zeros (no future value). At n=N-1, V̂_j(t_N) = max_{j'}[f_{j'}·dt - c_{jj'}].
 """
 function calculate_Y(X_prev, X_next, learning_model, exp_params, payoffmodel, n)
     @unpack dt, J, K, L, N = exp_params
