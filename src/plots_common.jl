@@ -587,8 +587,8 @@ function prepare_strategy_analysis(Vs, payoff, cost, sample_paths, times, dt, J;
     # Compute additional statistics
     normalized_mean_values = mean_values ./ mean(reference_values,dims=2)
     original_mean_values = copy(mean_values)
-    predictions = compute_predictions(Vs, other_strategies, sample_paths, times, 
-                                   initial_mode, original_mean_values)
+    predictions = compute_predictions(Vs, other_strategies, sample_paths, times,
+                                   initial_mode, original_mean_values, payoff, cost, dt, J)
     differences = reference_index === nothing ? nothing :
         compute_differences(strategies, strategies[reference_index], num_times, num_paths)
 
@@ -765,15 +765,20 @@ function compute_differences(strategies, optimal_strategies, num_times, num_path
     return differences
 end
 
-function compute_predictions(Vs, other_strategies, sample_paths, times, initial_mode, original_mean_values)
+function compute_predictions(Vs, other_strategies, sample_paths, times, initial_mode, original_mean_values, payoff, cost, dt, J)
     num_strategies = length(Vs) + length(other_strategies)
     predictions = Vector{Float64}(undef, num_strategies)
 
     for (i, V) in enumerate(Vs)
         if V.name ∉ ["greedy", "a posteriori"]
             initial_state = sample_paths[:, 1, :]
-            predictions[i] = mean([V(initial_state[:, j], times[1], initial_mode)[1] 
-                                 for j in 1:size(sample_paths, 3)])
+            predictions[i] = mean([begin
+                state = initial_state[:, s]
+                f = payoff(state, times[1]*dt) .* dt
+                c = cost(state, times[1]*dt)
+                g = [V(state, times[1], j)[1] for j in 1:J]
+                maximum(f .+ g .- c[initial_mode, :])
+            end for s in 1:size(sample_paths, 3)])
         else
             predictions[i] = original_mean_values[end, i]
         end
@@ -783,8 +788,13 @@ function compute_predictions(Vs, other_strategies, sample_paths, times, initial_
         index = length(Vs) + i
         if name ∉ ["greedy", "a posteriori"]
             initial_state = sample_paths[:, 1, :]
-            predictions[index] = mean([V(initial_state[:, j], times[1], initial_mode)[1] 
-                                     for j in 1:size(sample_paths, 3)])
+            predictions[index] = mean([begin
+                state = initial_state[:, s]
+                f = payoff(state, times[1]*dt) .* dt
+                c = cost(state, times[1]*dt)
+                g = [strategy(state, times[1], j)[1] for j in 1:J]
+                maximum(f .+ g .- c[initial_mode, :])
+            end for s in 1:size(sample_paths, 3)])
         else
             predictions[index] = original_mean_values[end, index]
         end

@@ -69,7 +69,7 @@ LinearRegressor = MLJ.@load LinearRegressor pkg = MLJLinearModels
 RidgeRegressor = MLJ.@load RidgeRegressor pkg = MLJLinearModels
 LassoRegressor = MLJ.@load LassoRegressor pkg = MLJLinearModels
 PCA = MLJ.@load PCA pkg = MultivariateStats
-InteractionTransformer = MLJ.@load InteractionTransformer pkg=MLJModels
+InteractionTransformer = MLJ.@load InteractionTransformer pkg=MLJTransforms
 LGBMReg = MLJ.@load LGBMRegressor pkg=LightGBM
 # Export plot functions
 export plot_3d
@@ -427,7 +427,7 @@ function create_models_by_type(d, N, J; model_types=["pca_knn"])
             ridge = Standardizer() |> RidgeRegressor(lambda=0.1)
             push!(selected_models, model_to_learningmodel(ridge, "ridge", "MLJ", N, J))
         elseif model_type == "linear"
-            # Linear regression with interactions
+            # Linear regression with interactions for low-dim, plain for high-dim
             if d < 5
                 linear = Standardizer() |> InteractionTransformer(order=6) |> LinearRegressor()
             else
@@ -508,10 +508,10 @@ function get_models(d,N,J)
     lm_ridge = OptSwitch.model_to_learningmodel(ridge,"ridge","MLJ",N,J)
     lasso = Standardizer() |> LassoRegressor(lambda=0.1)
     lm_lasso = OptSwitch.model_to_learningmodel(lasso,"lasso","MLJ",N,J)
-    if d < 5 
-        linear =  Standardizer() |>  InteractionTransformer(order=6) |>  LinearRegressor() #InteractionTransformer(order=6) |>
+    if d < 5
+        linear = Standardizer() |> InteractionTransformer(order=6) |> LinearRegressor()
     else
-        linear =  Standardizer() |>  LinearRegressor() #InteractionTransformer(order=6) |>
+        linear = Standardizer() |> LinearRegressor()
     end
     lm_linear = OptSwitch.model_to_learningmodel(linear,"linear","MLJ",N,J)
     return [lm_network_1, lm_network_2, lm_knn, lm_forest, lm_ridge, lm_lasso, lm_linear,lm_lgbm]
@@ -692,32 +692,31 @@ end
 
 # Dictionary to store loggers for each model
 const model_loggers = Dict{String, ModelLogger}()
+const model_loggers_lock = ReentrantLock()
 
-function MLJ_main_loop!(learning_model, X_prev, X_next, n, exp_params, PayOffModel, dir, save_results=true)
+function MLJ_main_loop!(learning_model, X_prev, X_next, n, exp_params, PayOffModel, dir, do_save=true)
     @unpack J, N = exp_params
-    
-    # Initialize or get logger for this model
-    if !haskey(model_loggers, learning_model.name)
-        # Create a more detailed logger with metadata
-        metadata = Dict(
-            "model_type" => learning_model.pkg,
-            "dimensions" => size(X_prev, 1),
-            "samples" => size(X_prev, 2),
-            "experiment_dir" => dir
-        )
-        
-        # Create log directory
-        log_base_dir = joinpath(datadir(dir), "logs")
-        
-        model_loggers[learning_model.name] = ModelLogger(
-            learning_model.name, 
-            N, 
-            J, 
-            log_dir=log_base_dir,
-            metadata=metadata
-        )
+
+    # Initialize or get logger for this model (thread-safe)
+    logger = lock(model_loggers_lock) do
+        if !haskey(model_loggers, learning_model.name)
+            metadata = Dict(
+                "model_type" => learning_model.pkg,
+                "dimensions" => size(X_prev, 1),
+                "samples" => size(X_prev, 2),
+                "experiment_dir" => dir
+            )
+            log_base_dir = joinpath(datadir(dir), "logs")
+            model_loggers[learning_model.name] = ModelLogger(
+                learning_model.name,
+                N,
+                J,
+                log_dir=log_base_dir,
+                metadata=metadata
+            )
+        end
+        model_loggers[learning_model.name]
     end
-    logger = model_loggers[learning_model.name]
     
     Y = calculate_Y(X_prev, X_next, learning_model, exp_params, PayOffModel, n)
     X_train, X_test, Y_train, Y_test = split_data(X_prev, Y)
@@ -745,7 +744,7 @@ function MLJ_main_loop!(learning_model, X_prev, X_next, n, exp_params, PayOffMod
             "n" => n
         )
         
-        if save_results
+        if do_save
             save_results(merge(exp_params, results), dir)
         end
         GC.gc(true)  # Force GC after each batch
@@ -784,28 +783,36 @@ end
 """
     calculate_Y(X_prev, X_next, learning_model, exp_params, payoffmodel, n)
 
-Compute regression targets for continuation values g_j per target mode.
+Compute regression targets Y[k,j] = (1/L) Σ_l V̂_j(t_{n+1}, X^{k,l}_{t_{n+1}}).
 
-# Arguments
-- `X_prev::Matrix`: Current states at time step n, size (d, K)
-- `X_next::Matrix`: Next states at time step n+1, size (d, K*L)
-- `learning_model::LearningModel`: Model for estimating continuation values
-- `exp_params::parameters`: Experiment parameters
-- `payoffmodel::PayOffModel`: Payoff and cost model
-- `n::Int`: Current time step
+Each model j learns g_j(t_n, x) = E[V̂_j(t_{n+1}, X) | X_{t_n} = x], where
+    V̂_j(t_{n+1}, x) = max_{j'} [ dt·f_{j'} - c_{jj'} + ĝ_{j'}(t_{n+1}, x) ]
+is the reconstructed value function at t_{n+1}. Max is applied per sample
+before averaging over L transitions (correct order: max outside E).
 
-# Returns
-- `Y::Matrix{Float}`: Regression targets of size (K, J) where Y[k,j] is the
-  continuation value V̂_j(t_{n+1}, X^k_{t_{n+1}}) for target mode j.
-
-# Details
-Each model j learns the continuation value g_j(t_n, x) = E[V̂_j(t_{n+1}, X) | X_{t_n} = x].
-The value function is then reconstructed at prediction time via:
-    V̂_i(t_n, x) = max_j [ f_j·dt - c_{ij} + ĝ_j(t_n, x) ]
-This matches the standard Bellman equation with max outside E.
+Terminal condition: at n=N no next step exists, so model[N,j] is trained on 0.
+At n=N-1 the targets are E[max_{j'}[f_{j'}(t_N) - c_{jj'}]] (last-step payoffs).
 """
 function calculate_Y(X_prev, X_next, learning_model, exp_params, payoffmodel, n)
-    return values(learning_model, X_next, n, exp_params)
+    @unpack dt, J, K, L, N = exp_params
+
+    # Terminal: no next step exists, train model[N,j] on 0
+    n == N && return zeros(Float32, K, J)
+
+    KL = K * L
+
+    # ĝ_{j'}(t_{n+1}, X_next) for all K*L points, shape (KL, J)
+    g_preds = hcat([learning_model(X_next, n + 1, j) for j in 1:J]...)
+
+    # f_{j'}(t_{n+1}, x) and c_{j,j'}(t_{n+1}, x), shapes (KL,J) and (KL,J,J)
+    f_next, C_next = profit_and_cost(X_next, payoffmodel, n + 1, dt, KL, J)
+
+    # V̂_j(t_{n+1}, X_next[:,kl]) = max_{j'}[ f_{j'} - c_{jj'} + ĝ_{j'} ]
+    V_hat = [maximum(f_next[kl, :] .+ g_preds[kl, :] .- C_next[kl, j, :])
+             for kl in 1:KL, j in 1:J]  # (KL, J)
+
+    # Average over L inner transitions → (K, J)
+    return mean(reshape(V_hat, (L, K, J)), dims=1)[1, :, :]
 end
 
 function model_to_learningmodel(model, name, pkg, N, J)
