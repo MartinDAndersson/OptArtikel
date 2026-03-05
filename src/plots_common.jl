@@ -808,6 +808,9 @@ function compute_strategy_for_value(V, sample_paths, times, cost, payoff, dt, in
     predicted_values = zeros(num_times, num_paths)
     actual_strategy = zeros(Int, num_times, num_paths)
 
+    # Warm up gpu_device/cpu_device cache before threaded loop to avoid Dict race
+    try; Main.Lux.gpu_device(); Main.Lux.cpu_device(); catch; end
+
     Threads.@threads for path in 1:num_paths
         current_mode = initial_mode
         for t in 1:num_times

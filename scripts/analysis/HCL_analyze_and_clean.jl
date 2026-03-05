@@ -123,7 +123,7 @@ function analyze_and_clean(d)
 end
 
 # Run for completed dimensions
-for d in [30]
+for d in [40]
     analyze_and_clean(d)
     GC.gc(true)
 end
