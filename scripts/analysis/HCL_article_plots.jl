@@ -176,7 +176,7 @@ end
 
 push!(LOAD_PATH, scriptsdir("plotting"))
 using hcl_plots
-data_dir = datadir("carmona_dim/machines")
+data_dir = datadir("HCL/machines")
 
 
 # # --- 8. Load and Filter Models ---
@@ -232,7 +232,7 @@ data_dir = datadir("carmona_dim/machines")
 
 # Save the figures
 function prepare_analysis(RandomProcess, payoff_c, cost_c, x0, d, K, N, dt, p, J)
-    data_dir = datadir("carmona_dim/machines")
+    data_dir = datadir("HCL/machines")
 
     m = readdir(data_dir)
     m = filter(x -> occursin("d=$d"*"_", x), m)

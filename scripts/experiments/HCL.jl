@@ -287,12 +287,12 @@ function main(d, L; old_models=[], dir="default", model_types=["forest"])
 end
 
 # Choose the number of dimensions and L values to iterate over
-d_values = [10]
+d_values = [2]
 L_values = [1]
 for d in d_values
     @info "Running experiment for dimension $d"
     for L in L_values
-        main(d,L;dir=datadir("HCL"),model_types=["forest"])
+        main(d,L;dir="carmona_dim",model_types=["knn", "network", "forest", "lgbm", "linear", "ridge", "lasso"])
     end
 end
 
