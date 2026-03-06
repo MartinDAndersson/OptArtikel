@@ -503,3 +503,5 @@ neural_network_test_results/regression_test.png
 neural_network_test_results/training_test.png
 strategy_analysis.csv
 results_backup/
+PLAN_sequential_loading.md
+EXPERIMENT_STATUS.md
