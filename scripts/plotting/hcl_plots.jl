@@ -40,6 +40,9 @@ export create_full_value_grid
 export calculate_strategy_distances_gray
 export calculate_strategy_distance
 export generate_visualizations
+export prepare_strategy_analysis_from_data
+export compute_strategy_for_value
+export calculate_accumulated_value
 
 include(srcdir("plots_common.jl"))
 
