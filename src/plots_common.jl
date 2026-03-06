@@ -576,38 +576,51 @@ function prepare_strategy_analysis(Vs, payoff, cost, sample_paths, times, dt, J;
     @assert num_times == length(times) "Number of time points should match sample paths"
 
     # Compute core data
-    strategies, accumulated_values, mean_values, strategy_names = 
+    strategies, accumulated_values, mean_values, strategy_names =
         compute_strategy_data(Vs, other_strategies, sample_paths, times, payoff,
                             cost, dt, initial_mode,J)
-    
-    # Calculate reference metrics
-    reference_values, reference_index, diff_limits = 
-        compute_reference_metrics(accumulated_values, strategy_names)
-    
-    # Compute additional statistics
-    normalized_mean_values = mean_values ./ mean(reference_values,dims=2)
+
     original_mean_values = copy(mean_values)
     predictions = compute_predictions(Vs, other_strategies, sample_paths, times,
                                    initial_mode, original_mean_values, payoff, cost, dt, J)
+
+    return prepare_strategy_analysis_from_data(
+        strategies, accumulated_values, mean_values, strategy_names, predictions,
+        sample_paths, payoff, cost, times, dt, J; initial_mode=initial_mode
+    )
+end
+
+function prepare_strategy_analysis_from_data(
+        strategies, accumulated_values, mean_values, strategy_names, predictions,
+        sample_paths, payoff, cost, times, dt, J; initial_mode=1)
+    d, num_times, num_paths = size(sample_paths)
+
+    # Calculate reference metrics
+    reference_values, reference_index, diff_limits =
+        compute_reference_metrics(accumulated_values, strategy_names)
+
+    # Compute additional statistics
+    normalized_mean_values = mean_values ./ mean(reference_values,dims=2)
     differences = reference_index === nothing ? nothing :
         compute_differences(strategies, strategies[reference_index], num_times, num_paths)
 
     distances = calculate_strategy_distances_gray(
-        strategies, 
-        strategy_names, 
-        sample_paths, 
-        payoff, 
-        cost, 
+        strategies,
+        strategy_names,
+        sample_paths,
+        payoff,
+        cost,
         dt,
         predictions,  # Use predictions instead of mean_values
         reference_index;  # Add reference_index
         initial_mode=initial_mode
     )
-    
+
+    original_mean_values = copy(mean_values)
     # Create summary
-    summary_df = get_summary_df(strategy_names, mean_values, normalized_mean_values, 
+    summary_df = get_summary_df(strategy_names, mean_values, normalized_mean_values,
                               predictions, differences,original_mean_values)
-    
+
     return (
         strategies = strategies,
         accumulated_values = accumulated_values,
